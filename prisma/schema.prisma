@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+/**
+ * ======================
+ * USER MODEL
+ * =======================
+ */
+model User {
+  id             String     @id @default(auto()) @map("_id") @db.ObjectId
+  email          String     @unique
+  username       String     @default("")
+  phoneNumber    String     @default("")
+  password       String     @default("")
+  region         String     @default("")
+  country        String     @default("")
+  role           UserRole   @default(USER)
+  userStatus     UserStatus @default(ACTIVE)
+  fcmToken       String?    @default("")
+  dob            DateTime?
+  image          String     @default("")
+  expirationOtp  DateTime?
+  otp            Int?
+  isNotification Boolean    @default(true)
+  status         UserStatus @default(ACTIVE)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  isGoogleAuth   Boolean    @default(false)
+  lastLogin      DateTime?  @default(now())
+
+  notifications Notification[] @relation("UserRelation")
+  likes         Like[]         @relation("UserLikes")
+  posts         Post[]         @relation("UserPosts")
+  comments      Comment[]      @relation("UserComments")
+
+  // Relations
+  messagesSent     Message[] @relation("SentMessages")
+  messagesReceived Message[] @relation("ReceivedMessages")
+  rooms            RoomUser[]
+  callsMade        Call[]    @relation("CallCaller")
+  callsReceived    Call[]    @relation("CallReceiver")
+
+  @@map("users")
+}
+
+/**
+ * ======================
+ * POSTS
+ * =======================
+ */
+model Post {
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  authorId   String     @db.ObjectId
+  content    String?
+  imageUrl   String?
+  likeCount  Int        @default(0)
+  commentCount Int      @default(0)
+  visibility Visibility @default(PUBLIC)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  author   User?     @relation("UserPosts", fields: [authorId], references: [id])
+  comments Comment[] @relation("PostComments")
+  likes    Like[]    @relation("PostLikes")
+
+  @@map("posts")
+}
+
+/**
+ * ======================
+ * COMMENTS
+ * =======================
+ */
+model Comment {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  postId    String   @db.ObjectId
+  authorId  String   @db.ObjectId
+  parentId  String?  @db.ObjectId
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post   Post? @relation("PostComments", fields: [postId], references: [id])
+  author User? @relation("UserComments", fields: [authorId], references: [id])
+
+  // SELF-RELATION FIX
+  replies Comment[] @relation("CommentReplies") // ← remove onDelete/onUpdate here
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  likes Like[]
+
+  @@map("comments")
+}
+
+/**
+ * ======================
+ * LIKE
+ * =======================
+ */
+model Like {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  postId    String?  @db.ObjectId
+  commentId String?  @db.ObjectId
+  createdAt DateTime @default(now())
+
+  user    User?    @relation("UserLikes", fields: [userId], references: [id])
+  post    Post?    @relation("PostLikes", fields: [postId], references: [id])
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("likes")
+}
+
+/**
+ * ======================
+ * NOTIFICATION
+ * =======================
+ */
+model Notification {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  title     String
+  body      String
+  data      String?  @default("")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation("UserRelation", fields: [userId], references: [id], onDelete: NoAction)
+
+  @@map("notifications")
+}
+
+/// ======================
+/// ROOM
+/// ======================
+model Room {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  name      String?
+  type      RoomType   @default(DIRECT) // DIRECT | GROUP
+  createdAt DateTime   @default(now())
+
+  // Members (explicit many-to-many)
+  roomUsers RoomUser[]
+
+  messages Message[]
+  calls    Call[]
+}
+
+enum RoomType {
+  DIRECT
+  GROUP
+}
+
+/// ======================
+/// ROOM USER (join table for Room <-> User)
+/// ======================
+model RoomUser {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  roomId String @db.ObjectId
+  userId String @db.ObjectId
+
+  room Room @relation(fields: [roomId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([roomId, userId])
+}
+
+/// ======================
+/// MESSAGE
+/// ======================
+model Message {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  content   String
+  createdAt DateTime @default(now())
+
+  senderId   String
+  receiverId String?    // Only for 1-to-1 chat
+  roomId     String
+
+  // Relations
+  sender   User   @relation("SentMessages", fields: [senderId], references: [id])
+  receiver User?  @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  room     Room   @relation(fields: [roomId], references: [id])
+}
+
+/// ======================
+/// CALL
+/// ======================
+model Call {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  callType    CallType
+  status      CallStatus @default(PENDING)
+  createdAt   DateTime @default(now())
+  startedAt   DateTime?
+  endedAt     DateTime?
+
+  callerId    String
+  receiverId  String
+  roomId      String?
+
+  caller      User @relation("CallCaller", fields: [callerId], references: [id])
+  receiver    User @relation("CallReceiver", fields: [receiverId], references: [id])
+  room        Room? @relation(fields: [roomId], references: [id])
+}
+
+enum CallType {
+  AUDIO
+  VIDEO
+}
+
+enum CallStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  ENDED
+}
+
+
+/**
+ * ======================
+ * ENUMS
+ * =======================
+ */
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum UserRole {
+  ADMIN
+  SUPER_ADMIN
+  USER
+}
+
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
