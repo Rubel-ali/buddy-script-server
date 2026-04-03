@@ -54,17 +54,18 @@ const createIntoDb = async ({ userId, reqBody, files }: IPostServiceParams) => {
   return post;
 };
 
-const getListFromDb = async (userId: string) => {
+const getListFromDb = async (userId?: string) => {
   const result = await prisma.post.findMany({
     where: {
       OR: [
-        { visibility: "PUBLIC" },
-        {
-          AND: [
-            { visibility: "PRIVATE" },
-            { authorId: userId }, // ✅ logged-in user এর id
-          ],
-        },
+        { visibility: "PUBLIC" }, // 🌍 সবাই দেখবে
+        ...(userId
+          ? [
+              {
+                authorId: userId, // 🔒 নিজের সব post (PRIVATE + PUBLIC)
+              },
+            ]
+          : []),
       ],
     },
     select: {
@@ -88,6 +89,9 @@ const getListFromDb = async (userId: string) => {
           image: true,
         },
       },
+    },
+    orderBy: {
+      createdAt: "desc",
     },
   });
 

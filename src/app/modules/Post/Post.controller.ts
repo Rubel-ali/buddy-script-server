@@ -23,7 +23,10 @@ const createPost = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getPostList = catchAsync(async (req: Request, res: Response) => {
-  const result = await PostService.getListFromDb();
+  const userId = (req.user as { id?: string })?.id; // ✅ add this
+
+  const result = await PostService.getListFromDb(userId); // ✅ pass userId
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
