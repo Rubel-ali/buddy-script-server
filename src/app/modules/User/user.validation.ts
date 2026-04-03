@@ -3,7 +3,9 @@ import { z } from "zod";
 const CreateUserValidationSchema = z.object({
   email: z.string().email("Invalid email address").min(1, "Email is required"),
   username: z.string().optional(),
-  phoneNumber: z.string().optional(), // ✅
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  phoneNumber: z.string().optional(),
   isResticted: z.boolean().optional(),
   isNotification: z.boolean().optional(),
   password: z
@@ -23,6 +25,9 @@ const UserLoginValidationSchema = z.object({
 
 const userUpdateSchema = z.object({
   username: z.string().optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  email: z.string().email().optional(),
   promoCode: z.string().optional(),
   profileImage: z.string().optional(),
   profession: z.string().optional(),

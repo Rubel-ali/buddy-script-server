@@ -73,6 +73,8 @@ const getMyProfile = async (userToken: string) => {
     select: {
       id: true,
       username: true,
+      firstName: true,
+      lastName: true,
       email: true,
       image: true,
       isNotification: true,
