@@ -5,6 +5,7 @@ import { NotificationRoutes } from "../modules/Notification/Notification.routes"
 import passportRoutes from "../modules/Auth/passport.routes";
 import { PostRoutes } from "../modules/Post/Post.routes";
 import { LikeRouter } from "../modules/Like/like.routes";
+import { CommentRoutes } from "../modules/Comment/Comment.routes";
 
 
 const router = express.Router();
@@ -29,6 +30,10 @@ const moduleRoutes = [
   {
     path: "/likes",
     route: LikeRouter,
+  },
+  {
+    path: "/comments",
+    route: CommentRoutes,
   },
   {
     path: "/notifications",
