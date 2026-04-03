@@ -122,7 +122,6 @@ const deletePost = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-
 export const PostController = {
   createPost,
   getPostList,

@@ -58,11 +58,11 @@ const getListFromDb = async (userId?: string) => {
   const result = await prisma.post.findMany({
     where: {
       OR: [
-        { visibility: "PUBLIC" }, // 🌍 সবাই দেখবে
+        { visibility: "PUBLIC" }, // All PUBLIC posts
         ...(userId
           ? [
               {
-                authorId: userId, // 🔒 নিজের সব post (PRIVATE + PUBLIC)
+                authorId: userId, //  Only Me posts (PRIVATE + PUBLIC)
               },
             ]
           : []),
