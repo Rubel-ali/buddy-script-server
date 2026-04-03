@@ -10,7 +10,11 @@ import crypto from "crypto";
 import emailSender from "../../../helpars/emailSender/brevoMailSender";
 
 // user login
-const loginUser = async (payload: { email: string; password: string, fcmToken?:string }) => {
+const loginUser = async (payload: {
+  email: string;
+  password: string;
+  fcmToken?: string;
+}) => {
   const userData = await prisma.user.findUnique({
     where: {
       email: payload.email,
@@ -20,18 +24,18 @@ const loginUser = async (payload: { email: string; password: string, fcmToken?:s
   if (!userData?.email) {
     throw new ApiError(
       httpStatus.NOT_FOUND,
-      "User not found! with this email " + payload.email
+      "User not found! with this email " + payload.email,
     );
   }
   const isCorrectPassword: boolean = await bcrypt.compare(
     payload.password,
-    userData.password
+    userData.password,
   );
 
   if (!isCorrectPassword) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Password incorrect!");
   }
-  if(payload.fcmToken){
+  if (payload.fcmToken) {
     await prisma.user.update({
       where: {
         id: userData.id,
@@ -48,9 +52,8 @@ const loginUser = async (payload: { email: string; password: string, fcmToken?:s
       role: userData.role,
     },
     config.jwt.jwt_secret as string,
-    config.jwt.expires_in as string // or number
+    config.jwt.expires_in as string, // or number
   );
-  
 
   return { token: accessToken, role: userData.role };
 };
@@ -60,7 +63,7 @@ const loginUser = async (payload: { email: string; password: string, fcmToken?:s
 const getMyProfile = async (userToken: string) => {
   const decodedToken = jwtHelpers.verifyToken(
     userToken,
-    config.jwt.jwt_secret!
+    config.jwt.jwt_secret!,
   );
 
   const userProfile = await prisma.user.findUnique({
@@ -87,11 +90,11 @@ const getMyProfile = async (userToken: string) => {
 const changePassword = async (
   userToken: string,
   newPassword: string,
-  oldPassword: string
+  oldPassword: string,
 ) => {
   const decodedToken = jwtHelpers.verifyToken(
     userToken,
-    config.jwt.jwt_secret!
+    config.jwt.jwt_secret!,
   );
 
   const user = await prisma.user.findUnique({

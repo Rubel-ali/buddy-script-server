@@ -8,7 +8,7 @@ const emailSender = async (email: string, html: string, p0: string) => {
     secure: false, // Use true for port 465, false for port 587
     auth: {
       user: config.emailSender.email,
-      pass: config.emailSender.app_pass,
+      pass: config.emailSender.app_password,
     },
     tls: {
       rejectUnauthorized: false,
