@@ -13,30 +13,22 @@ interface GoogleUser {
   userType: string;
 }
 
-// ==============================
-// 🔥 STEP 1: Google Login
-// ==============================
+// Step 1: Redirect to Google login
 router.get(
   "/google",
-  passport.authenticate("google", {
-    scope: ["profile", "email"],
-    prompt: "select_account", // ✅ FIX: force account selection
-  })
+  passport.authenticate("google", { scope: ["profile", "email"] })
 );
 
-// ==============================
-// 🔥 STEP 2: Google Callback
-// ==============================
+// Step 2: Google callback
 router.get(
   "/google/callback",
   passport.authenticate("google", { session: false }),
   (req, res) => {
     const data = req.user as GoogleUser;
 
-    // ✅ Create JWT
-    const token = jwtHelpers.createToken(
+    const tokens = jwtHelpers.createToken(
       {
-        id: data.id, // 🔥 IMPORTANT
+        id: data.id,
         email: data.email,
         name: data.username,
         role: data.role,
@@ -47,12 +39,10 @@ router.get(
     );
 
     const frontendURL = process.env.FRONTEND_URL || "http://localhost:3000";
-
-    // ✅ Redirect with params
     res.redirect(
       `${frontendURL}/login?` +
         `id=${data.id}&username=${data.username}&role=${data.role}&` +
-        `email=${data.email}&userType=${data.userType}&accessToken=${token}`
+        `email=${data.email}&userType=${data.userType}&accessToken=${tokens}`
     );
   }
 );
