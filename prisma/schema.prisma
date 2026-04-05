@@ -79,6 +79,27 @@ model Post {
  * COMMENTS
  * =======================
  */
+// model Comment {
+//   id        String   @id @default(auto()) @map("_id") @db.ObjectId
+//   postId    String   @db.ObjectId
+//   authorId  String   @db.ObjectId
+//   parentId  String?  @db.ObjectId
+//   content   String
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+
+//   post   Post? @relation("PostComments", fields: [postId], references: [id])
+//   author User? @relation("UserComments", fields: [authorId], references: [id])
+
+//   // SELF-RELATION FIX
+//   replies Comment[] @relation("CommentReplies") // ← remove onDelete/onUpdate here
+//   parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+//   likes Like[]
+
+//   @@map("comments")
+// }
+
 model Comment {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   postId    String   @db.ObjectId
@@ -88,11 +109,11 @@ model Comment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  post   Post? @relation("PostComments", fields: [postId], references: [id])
-  author User? @relation("UserComments", fields: [authorId], references: [id])
+  post   Post @relation("PostComments", fields: [postId], references: [id])
+  author User @relation("UserComments", fields: [authorId], references: [id])
 
-  // SELF-RELATION FIX
-  replies Comment[] @relation("CommentReplies") // ← remove onDelete/onUpdate here
+  // Self relation
+  replies Comment[] @relation("CommentReplies")
   parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   likes Like[]

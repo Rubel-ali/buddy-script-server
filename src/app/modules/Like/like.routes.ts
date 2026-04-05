@@ -6,12 +6,12 @@ import { likeController } from "./like.controller";
 
 const router = Router();
 
-router.post("/:id", auth(), likeController.toggleLike);
+router.get("/:postId", auth(), likeController.getLikesByPost);
 
 router.patch("", auth(), likeController.toggleLike);
 // get all my like id
 
-router.get("/", auth(), likeController.getAllMyLikeIds);
+router.get("/", auth(), likeController.getAllMyLikes);
 
 router.delete("/unlike/:id", auth(), likeController.unlike);
 

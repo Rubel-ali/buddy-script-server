@@ -14,3 +14,8 @@ export interface IDeletePostParams {
   postId: string;
   userId: string; // logged-in user ID
 }
+
+export interface DeletePostInput {
+  postId: string;
+  currentUserId: string;
+}

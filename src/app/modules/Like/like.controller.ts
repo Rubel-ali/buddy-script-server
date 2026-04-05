@@ -30,10 +30,10 @@ const unlike = catchAsync(async (req, res) => {
 });
 
 
-const getAllMyLikeIds = catchAsync(async (req, res) => {
+const getAllMyLikes = catchAsync(async (req, res) => {
   const user = req.user;
   console.log(user)
-  const result = await LikeService.getAllMyLikeIds(user as JwtPayload);
+  const result = await LikeService.getAllMyLikes(user as JwtPayload);
   console.log(result)
   sendResponse(res, {
     success: true,
@@ -57,10 +57,24 @@ const toggleLikes = catchAsync(async (req, res) => {
   });
 });
 
+const getLikesByPost = catchAsync(async (req, res) => {
+  const { postId } = req.params;
+
+  const result = await LikeService.getLikesByPost(postId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "Likes fetched successfully",
+    data: result,
+  });
+});
+
 
 export const likeController = {
   toggleLike,
-  getAllMyLikeIds,
+  getAllMyLikes,
   unlike,
   toggleLikes,
+  getLikesByPost,
 };

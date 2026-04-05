@@ -8,6 +8,8 @@ interface GoogleUser {
   id: string;
   email: string;
   username: string;
+  firstName: string;
+  lastName: string;
   role: string;
   photo?: string | null;
   userType: string;
@@ -31,6 +33,8 @@ router.get(
         id: data.id,
         email: data.email,
         name: data.username,
+        firstName: data.firstName,
+        lastName: data.lastName,
         role: data.role,
         userType: data.userType,
       },
@@ -39,10 +43,17 @@ router.get(
     );
 
     const frontendURL = process.env.FRONTEND_URL || "http://localhost:3000";
+
     res.redirect(
       `${frontendURL}/login?` +
-        `id=${data.id}&username=${data.username}&role=${data.role}&` +
-        `email=${data.email}&userType=${data.userType}&accessToken=${tokens}`
+        `id=${data.id}&` +
+        `username=${data.username}&` +
+        `firstName=${data.firstName}&` +
+        `lastName=${data.lastName}&` +
+        `role=${data.role}&` +
+        `email=${data.email}&` +
+        `userType=${data.userType}&` +
+        `accessToken=${tokens}`
     );
   }
 );

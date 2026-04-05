@@ -4,6 +4,7 @@ import sendResponse from "../../../shared/sendResponse";
 import { PostService } from "./Post.service";
 import { Request, Response } from "express";
 import prisma from "../../../shared/prisma";
+import pick from "../../../shared/pick";
 
 const createPost = catchAsync(async (req: Request, res: Response) => {
   const userId = (req.user as { id?: string })?.id;
@@ -23,15 +24,19 @@ const createPost = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getPostList = catchAsync(async (req: Request, res: Response) => {
-  const userId = (req.user as { id?: string })?.id; // ✅ add this
+  const userId = (req.user as { id?: string })?.id;
 
-  const result = await PostService.getListFromDb(userId); // ✅ pass userId
+  const options = pick(req.query, ["limit", "page", "sortBy", "sortOrder"]);
+  const filters = pick(req.query, ["searchTerm"]);
+
+  const result = await PostService.getListFromDb(userId, options, filters);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: "Post list retrieved successfully",
-    data: result,
+    meta: result.meta,
+    data: result.data,
   });
 });
 

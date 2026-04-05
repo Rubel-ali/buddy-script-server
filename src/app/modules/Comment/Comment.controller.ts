@@ -4,23 +4,31 @@ import { CommentService } from "./Comment.service";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 
-const createComment = catchAsync(async (req: Request & { user?: any }, res: Response) => {
-  const authorId = req.user!.id; // token থেকে authorId
-  const { postId, content } = req.body;
+const createComment = catchAsync(
+  async (req: Request & { user?: any }, res: Response) => {
+    if (!req.user?.id) {
+      throw new Error("Unauthorized");
+    }
 
-  const result = await CommentService.createIntoDb({ postId, content, authorId });
-  sendResponse(res, {
-    statusCode: httpStatus.CREATED,
-    success: true,
-    message: "Comment created successfully",
-    data: result,
-  });
-});
+    const result = await CommentService.createIntoDb(
+      req.user.id, 
+      req.body
+    );
 
+    sendResponse(res, {
+      statusCode: httpStatus.CREATED,
+      success: true,
+      message: "Comment created successfully",
+      data: result,
+    });
+  }
+);
 
 const getCommentList = catchAsync(async (req: Request, res: Response) => {
   const postId = req.query.postId as string | undefined;
+
   const result = await CommentService.getListFromDb(postId);
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -31,6 +39,7 @@ const getCommentList = catchAsync(async (req: Request, res: Response) => {
 
 const getCommentById = catchAsync(async (req: Request, res: Response) => {
   const result = await CommentService.getByIdFromDb(req.params.id);
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -40,7 +49,11 @@ const getCommentById = catchAsync(async (req: Request, res: Response) => {
 });
 
 const updateComment = catchAsync(async (req: Request, res: Response) => {
-  const result = await CommentService.updateIntoDb(req.params.id, req.body);
+  const result = await CommentService.updateIntoDb(
+    req.params.id,
+    req.body
+  );
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -51,6 +64,7 @@ const updateComment = catchAsync(async (req: Request, res: Response) => {
 
 const deleteComment = catchAsync(async (req: Request, res: Response) => {
   const result = await CommentService.deleteItemFromDb(req.params.id);
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

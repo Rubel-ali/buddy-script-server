@@ -3,22 +3,26 @@ import ApiError from "../../../errors/ApiErrors";
 import prisma from "../../../shared/prisma";
 import { fileUploader } from "../../../helpars/fileUploader";
 import {
+  DeletePostInput,
   IDeletePostParams,
   IPostServiceParams,
   IPostUpdateParams,
 } from "./Post.interface";
+import { Prisma } from "@prisma/client";
+import { IPaginationOptions } from "../../../interfaces/paginations";
+import { paginationHelper } from "../../../helpars/paginationHelper";
 
 const createIntoDb = async ({ userId, reqBody, files }: IPostServiceParams) => {
   if (!userId) {
     throw new ApiError(httpStatus.UNAUTHORIZED, "Unauthorized access.");
   }
 
-  // ✅ Parse body
+  // Parse body
   const postData = JSON.parse(reqBody.text || "{}");
   const content = postData.content;
   const visibility = postData.visibility || "PUBLIC";
 
-  // ✅ Ensure there is either content or a file
+  // Ensure there is either content or a file
   const file = files?.file?.[0];
   if (!content && !file) {
     throw new ApiError(
@@ -27,7 +31,7 @@ const createIntoDb = async ({ userId, reqBody, files }: IPostServiceParams) => {
     );
   }
 
-  // ✅ Upload file if exists
+  // Upload file if exists
   let imageUrl: string | undefined = undefined;
   if (file) {
     const uploadResult = await fileUploader.uploadToCloudinary(file);
@@ -41,7 +45,7 @@ const createIntoDb = async ({ userId, reqBody, files }: IPostServiceParams) => {
     }
   }
 
-  // ✅ Create post in DB
+  // Create post in DB
   const post = await prisma.post.create({
     data: {
       authorId: userId,
@@ -54,20 +58,83 @@ const createIntoDb = async ({ userId, reqBody, files }: IPostServiceParams) => {
   return post;
 };
 
-const getListFromDb = async (userId?: string) => {
-  const result = await prisma.post.findMany({
-    where: {
+const getListFromDb = async (
+  userId: string | undefined,
+  options: IPaginationOptions,
+  params: { searchTerm?: string }
+) => {
+  const { limit, page, skip } = paginationHelper.calculatePagination(options);
+
+  const { searchTerm } = params;
+
+  const andConditions: Prisma.PostWhereInput[] = [];
+
+  // 🔍 Search by post content or author name
+  if (searchTerm) {
+    andConditions.push({
       OR: [
-        { visibility: "PUBLIC" }, // All PUBLIC posts
-        ...(userId
-          ? [
-              {
-                authorId: userId, //  Only Me posts (PRIVATE + PUBLIC)
-              },
-            ]
-          : []),
+        {
+          content: {
+            contains: searchTerm,
+            mode: "insensitive",
+          },
+        },
+        {
+          author: {
+            username: {
+              contains: searchTerm,
+              mode: "insensitive",
+            },
+          },
+        },
+        {
+          author: {
+            firstName: {
+              contains: searchTerm,
+              mode: "insensitive",
+            },
+          },
+        },
+        {
+          author: {
+            lastName: {
+              contains: searchTerm,
+              mode: "insensitive",
+            },
+          },
+        },
       ],
-    },
+    });
+  }
+
+  // 👁 Visibility filter
+  andConditions.push({
+    OR: [
+      { visibility: "PUBLIC" },
+      ...(userId
+        ? [
+            {
+              authorId: userId,
+            },
+          ]
+        : []),
+    ],
+  });
+
+  const whereConditions: Prisma.PostWhereInput =
+    andConditions.length > 0
+      ? { AND: andConditions }
+      : {};
+
+  const result = await prisma.post.findMany({
+    where: whereConditions,
+    skip,
+    take: limit,
+    orderBy:
+      options.sortBy && options.sortOrder
+        ? { [options.sortBy]: options.sortOrder }
+        : { createdAt: "desc" },
+
     select: {
       id: true,
       content: true,
@@ -75,7 +142,6 @@ const getListFromDb = async (userId?: string) => {
       visibility: true,
       createdAt: true,
       updatedAt: true,
-      comments: true,
 
       commentCount: true,
       likeCount: true,
@@ -89,13 +155,63 @@ const getListFromDb = async (userId?: string) => {
           image: true,
         },
       },
-    },
-    orderBy: {
-      createdAt: "desc",
+
+      comments: {
+        where: { parentId: null },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          content: true,
+          authorId: true,
+          createdAt: true,
+          updatedAt: true,
+
+          author: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              image: true,
+            },
+          },
+
+          replies: {
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true,
+              content: true,
+              createdAt: true,
+              updatedAt: true,
+
+              author: {
+                select: {
+                  id: true,
+                  username: true,
+                  firstName: true,
+                  lastName: true,
+                  image: true,
+                },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
-  return result;
+  const total = await prisma.post.count({
+    where: whereConditions,
+  });
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+    },
+    data: result,
+  };
 };
 
 const getByIdFromDb = async (id: string) => {
@@ -107,7 +223,7 @@ const getByIdFromDb = async (id: string) => {
 };
 
 const updateIntoDb = async ({ postId, reqBody, files }: IPostUpdateParams) => {
-  // ✅ Check if post exists
+  // Check if post exists
   const existingPost = await prisma.post.findUnique({
     where: { id: postId },
   });
@@ -115,7 +231,7 @@ const updateIntoDb = async ({ postId, reqBody, files }: IPostUpdateParams) => {
     throw new ApiError(httpStatus.NOT_FOUND, "Post not found");
   }
 
-  // ✅ Parse body safely
+  // Parse body safely
   let content = existingPost.content;
   let visibility: "PUBLIC" | "PRIVATE" = existingPost.visibility;
 
@@ -132,7 +248,7 @@ const updateIntoDb = async ({ postId, reqBody, files }: IPostUpdateParams) => {
     visibility = reqBody.visibility ?? visibility;
   }
 
-  // ✅ Handle file upload
+  // Handle file upload
   let imageUrl = existingPost.imageUrl;
   const file = files?.file?.[0];
   if (file) {
@@ -146,7 +262,7 @@ const updateIntoDb = async ({ postId, reqBody, files }: IPostUpdateParams) => {
     imageUrl = uploadResult.Location;
   }
 
-  // ✅ Update post in DB
+  // Update post in DB
   const updatedPost = await prisma.post.update({
     where: { id: postId },
     data: {
@@ -160,29 +276,38 @@ const updateIntoDb = async ({ postId, reqBody, files }: IPostUpdateParams) => {
   return updatedPost;
 };
 
-const deleteItemFromDb = async (id: string) => {
+const deleteItemFromDb = async ({ postId, currentUserId }: DeletePostInput) => {
   // Step 1: Check if post exists
   const existingPost = await prisma.post.findUnique({
-    where: { id },
+    where: { id: postId },
   });
 
   if (!existingPost) {
     throw new ApiError(httpStatus.NOT_FOUND, "Post not found");
   }
 
-  // Step 2: Delete all comments under this post (including replies)
+  // Step 2: Check if current user is author
+  // Convert to string to avoid ObjectId vs string mismatch
+  if (existingPost.authorId.toString() !== currentUserId.toString()) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "You can delete only your own posts",
+    );
+  }
+
+  // Step 3: Delete all comments under this post (including replies)
   await prisma.comment.deleteMany({
-    where: { postId: id },
+    where: { postId: postId },
   });
 
-  // Step 3: Delete all likes under this post
+  // Step 4: Delete all likes under this post
   await prisma.like.deleteMany({
-    where: { postId: id },
+    where: { postId: postId },
   });
 
-  // Step 4: Delete the post itself
+  // Step 5: Delete the post itself
   const deletedPost = await prisma.post.delete({
-    where: { id },
+    where: { id: postId },
   });
 
   return {
