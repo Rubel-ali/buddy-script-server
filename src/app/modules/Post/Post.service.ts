@@ -277,7 +277,6 @@ const updateIntoDb = async ({ postId, reqBody, files }: IPostUpdateParams) => {
 };
 
 const deleteItemFromDb = async ({ postId, currentUserId }: DeletePostInput) => {
-  // Step 1: Check if post exists
   const existingPost = await prisma.post.findUnique({
     where: { id: postId },
   });
@@ -286,32 +285,17 @@ const deleteItemFromDb = async ({ postId, currentUserId }: DeletePostInput) => {
     throw new ApiError(httpStatus.NOT_FOUND, "Post not found");
   }
 
-  // Step 2: Check if current user is author
-  // Convert to string to avoid ObjectId vs string mismatch
   if (existingPost.authorId.toString() !== currentUserId.toString()) {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      "You can delete only your own posts",
-    );
+    throw new ApiError(httpStatus.FORBIDDEN, "You can delete only your own posts");
   }
 
-  // Step 3: Delete all comments under this post (including replies)
-  await prisma.comment.deleteMany({
-    where: { postId: postId },
-  });
-
-  // Step 4: Delete all likes under this post
-  await prisma.like.deleteMany({
-    where: { postId: postId },
-  });
-
-  // Step 5: Delete the post itself
+  // ✅ শুধু এই লাইনটুকুই যথেষ্ট - বাকি সব (লাইক, কমেন্ট, রিপ্লাই) auto deleted হবে!
   const deletedPost = await prisma.post.delete({
     where: { id: postId },
   });
 
   return {
-    message: "Post deleted successfully",
+    message: "Post and all related data deleted successfully",
     deletedPost,
   };
 };

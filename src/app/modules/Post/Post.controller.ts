@@ -5,6 +5,7 @@ import { PostService } from "./Post.service";
 import { Request, Response } from "express";
 import prisma from "../../../shared/prisma";
 import pick from "../../../shared/pick";
+import ApiError from "../../../errors/ApiErrors";
 
 const createPost = catchAsync(async (req: Request, res: Response) => {
   const userId = (req.user as { id?: string })?.id;
@@ -67,64 +68,149 @@ const updatePost = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// const deletePost = catchAsync(async (req: Request, res: Response) => {
+//   const postId = req.params.id;
+//   const userId = (req.user as { id?: string })?.id;
+
+//   const existingPost = await prisma.post.findUnique({
+//     where: { id: postId },
+//   });
+
+//   if (!existingPost) {
+//     throw new ApiError(httpStatus.NOT_FOUND, "Post not found");
+//   }
+
+//   if (existingPost.authorId.toString() !== userId) {
+//     throw new ApiError(
+//       httpStatus.FORBIDDEN,
+//       "You can delete only your own posts",
+//     );
+//   }
+
+//   const deletedPost = await prisma.post.delete({
+//     where: { id: postId },
+//   });
+
+//   sendResponse(res, {
+//     statusCode: httpStatus.OK,
+//     success: true,
+//     message: "Post deleted successfully",
+//     data: deletedPost,
+//   });
+// });
+
 const deletePost = catchAsync(async (req: Request, res: Response) => {
   const postId = req.params.id;
-  const userId = (req.user as { id?: string })?.id;
 
-  if (!userId) {
-    return sendResponse(res, {
-      statusCode: httpStatus.UNAUTHORIZED,
-      success: false,
-      message: "User not authenticated",
-      data: null,
-    });
-  }
-
-  // Step 1: Check if post exists and belongs to this user
+  console.log("Attempting to delete post:", postId);
+  
+  // Check if post exists
   const existingPost = await prisma.post.findUnique({
     where: { id: postId },
   });
-
+  
   if (!existingPost) {
     return sendResponse(res, {
-      statusCode: httpStatus.NOT_FOUND,
+      statusCode: 404,
       success: false,
       message: "Post not found",
-      data: null,
+      data: undefined
     });
   }
-
-  if (existingPost.authorId !== userId) {
-    return sendResponse(res, {
-      statusCode: httpStatus.FORBIDDEN,
-      success: false,
-      message: "You are not allowed to delete this post",
-      data: null,
+  
+  try {
+    // Method 1: Recursive comment deletion
+    async function deleteCommentAndReplies(commentId: string) {
+      // First get all replies of this comment
+      const replies = await prisma.comment.findMany({
+        where: { parentId: commentId }
+      });
+      
+      // Delete all replies recursively
+      for (const reply of replies) {
+        await deleteCommentAndReplies(reply.id);
+      }
+      
+      // Delete the comment itself
+      await prisma.comment.delete({
+        where: { id: commentId }
+      });
+    }
+    
+    // Get all top-level comments of this post
+    const topLevelComments = await prisma.comment.findMany({
+      where: { 
+        postId: postId,
+        parentId: null 
+      }
     });
+    
+    // Delete each comment with its replies
+    for (const comment of topLevelComments) {
+      await deleteCommentAndReplies(comment.id);
+    }
+    
+    // Delete post likes
+    await prisma.like.deleteMany({
+      where: { postId: postId }
+    });
+    
+    // Finally delete post
+    const deletedPost = await prisma.post.delete({
+      where: { id: postId },
+    });
+    
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "Post and all related data deleted successfully",
+      data: deletedPost,
+    });
+    
+  } catch (error) {
+    console.error("Delete error:", error);
+    
+    // Method 2: Raw MongoDB query as last resort
+    try {
+      // Delete all comments (including replies) using raw query
+      await prisma.$runCommandRaw({
+        delete: "comments",
+        deletes: [{
+          q: { postId: { $oid: postId } },
+          limit: 0
+        }]
+      });
+      
+      // Delete all likes
+      await prisma.$runCommandRaw({
+        delete: "likes",
+        deletes: [{
+          q: { postId: { $oid: postId } },
+          limit: 0
+        }]
+      });
+      
+      // Delete the post
+      const deletedPost = await prisma.post.delete({
+        where: { id: postId },
+      });
+      
+      sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message: "Post and all related data deleted successfully (using raw query)",
+        data: deletedPost,
+      });
+      
+    } catch (Error: any) {
+      sendResponse(res, {
+        statusCode: 500,
+        success: false,
+        message: Error.message || "Failed to delete post",
+        data: null,
+      });
+    }
   }
-
-  // Step 2: Delete all comments under this post
-  await prisma.comment.deleteMany({
-    where: { postId },
-  });
-
-  // Step 3: Delete all likes under this post
-  await prisma.like.deleteMany({
-    where: { postId },
-  });
-
-  // Step 4: Delete the post itself
-  const deletedPost = await prisma.post.delete({
-    where: { id: postId },
-  });
-
-  // Step 5: Send response
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Post deleted successfully",
-    data: deletedPost,
-  });
 });
 
 export const PostController = {
