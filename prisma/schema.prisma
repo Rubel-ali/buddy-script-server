@@ -31,29 +31,29 @@ model User {
   isGoogleAuth   Boolean    @default(false)
   lastLogin      DateTime?  @default(now())
 
-  notifications    Notification[] @relation("UserRelation")
-  likes            Like[]         @relation("UserLikes")
-  posts            Post[]         @relation("UserPosts")
-  comments         Comment[]      @relation("UserComments")
-  messagesSent     Message[]      @relation("SentMessages")
-  messagesReceived Message[]      @relation("ReceivedMessages")
+  notifications Notification[] @relation("UserRelation")
+  likes         Like[]         @relation("UserLikes")
+  posts         Post[]         @relation("UserPosts")
+  comments      Comment[]      @relation("UserComments")
+  messagesSent     Message[] @relation("SentMessages")
+  messagesReceived Message[] @relation("ReceivedMessages")
   rooms            RoomUser[]
-  callsMade        Call[]         @relation("CallCaller")
-  callsReceived    Call[]         @relation("CallReceiver")
+  callsMade        Call[]    @relation("CallCaller")
+  callsReceived    Call[]    @relation("CallReceiver")
 
   @@map("users")
 }
 
 model Post {
-  id           String     @id @default(auto()) @map("_id") @db.ObjectId
-  authorId     String     @db.ObjectId
-  content      String?
-  imageUrl     String?
-  likeCount    Int        @default(0)
-  commentCount Int        @default(0)
-  visibility   Visibility @default(PUBLIC)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  authorId   String     @db.ObjectId
+  content    String?
+  imageUrl   String?
+  likeCount  Int        @default(0)
+  commentCount Int      @default(0)
+  visibility Visibility @default(PUBLIC)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
   author   User?     @relation("UserPosts", fields: [authorId], references: [id])
   comments Comment[] @relation("PostComments")
@@ -65,19 +65,21 @@ model Post {
 model Comment {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   content   String
-  postId    String
+  postId    String 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  post      Post     @relation("PostComments", fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String   @db.ObjectId
+  author    User     @relation("UserComments", fields: [authorId], references: [id])
 
-  post     Post   @relation("PostComments", fields: [postId], references: [id], onDelete: Cascade)
-  authorId String @db.ObjectId
-  author   User   @relation("UserComments", fields: [authorId], references: [id])
+  parentId  String?  @db.ObjectId
+  
+  // ✅ Self-relation: এখানে NoAction থাকতে হবে
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   Comment[] @relation("CommentReplies")
 
-  parentId String?   @db.ObjectId
-  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
-  replies  Comment[] @relation("CommentReplies")
-
-  likes Like[] @relation("CommentLikes")
+  likes     Like[]   @relation("CommentLikes")
 
   @@map("comments")
 }
@@ -85,14 +87,15 @@ model Comment {
 model Like {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   postId    String?
-  commentId String?
+  commentId String? 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   userId    String
-
-  post    Post?    @relation("PostLikes", fields: [postId], references: [id], onDelete: Cascade)
-  comment Comment? @relation("CommentLikes", fields: [commentId], references: [id], onDelete: Cascade)
-  user    User?    @relation("UserLikes", fields: [userId], references: [id])
+  
+  // ✅ এখানে onDelete: Cascade থাকবে
+  post      Post?    @relation("PostLikes", fields: [postId], references: [id], onDelete: Cascade)
+  comment   Comment? @relation("CommentLikes", fields: [commentId], references: [id], onDelete: Cascade)
+  user      User?    @relation("UserLikes", fields: [userId], references: [id])
 
   @@map("likes")
 }
@@ -113,14 +116,14 @@ model Notification {
 }
 
 model Room {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
   name      String?
-  type      RoomType @default(DIRECT)
-  createdAt DateTime @default(now())
+  type      RoomType   @default(DIRECT)
+  createdAt DateTime   @default(now())
 
   roomUsers RoomUser[]
-  messages  Message[]
-  calls     Call[]
+  messages Message[]
+  calls    Call[]
 }
 
 enum RoomType {
@@ -148,26 +151,26 @@ model Message {
   receiverId String?
   roomId     String
 
-  sender   User  @relation("SentMessages", fields: [senderId], references: [id])
-  receiver User? @relation("ReceivedMessages", fields: [receiverId], references: [id])
-  room     Room  @relation(fields: [roomId], references: [id])
+  sender   User   @relation("SentMessages", fields: [senderId], references: [id])
+  receiver User?  @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  room     Room   @relation(fields: [roomId], references: [id])
 }
 
 model Call {
-  id        String     @id @default(auto()) @map("_id") @db.ObjectId
-  callType  CallType
-  status    CallStatus @default(PENDING)
-  createdAt DateTime   @default(now())
-  startedAt DateTime?
-  endedAt   DateTime?
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  callType    CallType
+  status      CallStatus @default(PENDING)
+  createdAt   DateTime @default(now())
+  startedAt   DateTime?
+  endedAt     DateTime?
 
-  callerId   String
-  receiverId String
-  roomId     String?
+  callerId    String
+  receiverId  String
+  roomId      String?
 
-  caller   User  @relation("CallCaller", fields: [callerId], references: [id])
-  receiver User  @relation("CallReceiver", fields: [receiverId], references: [id])
-  room     Room? @relation(fields: [roomId], references: [id])
+  caller      User @relation("CallCaller", fields: [callerId], references: [id])
+  receiver    User @relation("CallReceiver", fields: [receiverId], references: [id])
+  room        Room? @relation(fields: [roomId], references: [id])
 }
 
 enum CallType {
